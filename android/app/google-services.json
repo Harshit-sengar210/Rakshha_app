@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "753549661698",
+    "project_id": "rakshha-16",
+    "storage_bucket": "rakshha-16.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:753549661698:android:9ed3d0feae07800014b91b",
+        "android_client_info": {
+          "package_name": "com.rakshaa.rakshaa"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "753549661698-je09js1oklthsl3r2430nccmupnmqj6s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rakshaa.rakshaa",
+            "certificate_hash": "067ae1943c78ae755bf87099175113f7b69483a6"
+          }
+        },
+        {
+          "client_id": "753549661698-67k9bv91r08p2lkbs2i9j7u9eht177fj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBH6HfRw91-a7-vC7HPhrgTlvBdKPDDkno"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753549661698-67k9bv91r08p2lkbs2i9j7u9eht177fj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

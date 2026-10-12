@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Function to check if the user is the super-admin
+    function isAdmin() {
+      return request.auth != null && request.auth.uid == '5mKPPive8qTS7ZdqOLQBjk596N03';
+    }
+
+    // Admin Panel: Grant full access to everything for the admin
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Android App: Users can only read and write their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Android App: Allow authenticated users to create and update emergencies
+    match /emergencies/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // OTPs: Allow unauthenticated users to create and read their OTPs for phone verification
+    match /otps/{phoneNumber} {
+      allow read, write: if true;
+    }
+  }
+}
