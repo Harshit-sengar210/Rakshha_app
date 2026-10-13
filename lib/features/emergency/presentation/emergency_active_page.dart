@@ -89,7 +89,9 @@ class _EmergencyActivePageState extends ConsumerState<EmergencyActivePage> with 
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(emergencyProvider.notifier).startEmergency();
+      if (ref.read(emergencyProvider).session?.status != EmergencyStatus.active) {
+        ref.read(emergencyProvider.notifier).startEmergency();
+      }
       _fetchLocation();
     });
   }
@@ -285,13 +287,6 @@ class _EmergencyActivePageState extends ConsumerState<EmergencyActivePage> with 
 
   @override
   Widget build(BuildContext context) {
-    // Automatically trigger alert dispatch for newly added contacts if emergency is active
-    ref.listen<ContactsState>(contactsProvider, (previous, next) {
-      if ((previous?.contacts.length ?? 0) != next.contacts.length) {
-        ref.read(emergencyProvider.notifier).startEmergency();
-      }
-    });
-
     final contactsState = ref.watch(contactsProvider);
     final userProfile = ref.watch(userProfileProvider);
     

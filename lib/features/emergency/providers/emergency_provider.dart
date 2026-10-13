@@ -11,6 +11,7 @@ import '../models/emergency_contact.dart';
 import '../models/emergency_location.dart';
 import '../../home/providers/home_provider.dart';
 import '../../contacts/providers/contacts_provider.dart';
+import 'package:rakshaa/core/services/app_location_service.dart';
 
 class EmergencyState {
   final EmergencySession? session;
@@ -39,6 +40,7 @@ class EmergencyState {
 class EmergencyNotifier extends Notifier<EmergencyState> {
   // Track phone numbers that have already received an alert in the current session
   final Set<String> _sentPhoneNumbers = {};
+  final Set<String> _pendingPhoneNumbers = {};
   bool _isDispatching = false;
 
   @override
@@ -193,6 +195,7 @@ class EmergencyNotifier extends Notifier<EmergencyState> {
       }
     }
 
+    _pendingPhoneNumbers.remove(cleanPhone);
     if (sentSuccessfully) {
       _sentPhoneNumbers.add(cleanPhone);
     }
@@ -201,18 +204,26 @@ class EmergencyNotifier extends Notifier<EmergencyState> {
   String? _activeSessionId;
 
   Future<void> startEmergency({bool forceRestart = false}) async {
-    final isNewEmergency = forceRestart || 
-        state.session == null || 
-        state.session?.status != EmergencyStatus.active;
+    final isCurrentlyActive = state.session?.status == EmergencyStatus.active;
 
-    if (isNewEmergency) {
+    if (forceRestart || !isCurrentlyActive) {
       _sentPhoneNumbers.clear();
+      _pendingPhoneNumbers.clear();
       _isDispatching = false;
       _activeSessionId = "em_${DateTime.now().millisecondsSinceEpoch}";
+
+      // Immediately activate session in state so any rapid subsequent calls know emergency is active
+      state = state.copyWith(
+        session: EmergencySession(
+          id: _activeSessionId!,
+          startedAt: DateTime.now(),
+          status: EmergencyStatus.active,
+        ),
+      );
     }
 
     if (_isDispatching) {
-      debugPrint('[Emergency] Alert dispatch already in progress. Ignoring concurrent call.');
+      debugPrint('[Emergency] Alert dispatch already in progress. Ignoring duplicate trigger.');
       return;
     }
     _isDispatching = true;
@@ -226,7 +237,7 @@ class EmergencyNotifier extends Notifier<EmergencyState> {
       final contactsState = ref.read(contactsProvider);
       for (final c in contactsState.contacts) {
         final clean = _normalizePhone(c.phone);
-        if (clean.isNotEmpty) {
+        if (clean.isNotEmpty && !registeredPhones.contains(clean)) {
           final displayName = c.name.isNotEmpty ? c.name : (c.isPriority ? 'Priority Contact' : 'Trusted Contact');
           realContacts.add(
             EmergencyAlertContact(
@@ -303,44 +314,41 @@ class EmergencyNotifier extends Notifier<EmergencyState> {
       } catch (e) {
         debugPrint("Error fetching direct contacts from firestore: $e");
       }
-        
 
       // Get current live position or cached position
       double lat = state.location?.latitude ?? 0.0;
       double lng = state.location?.longitude ?? 0.0;
+      if (lat == 0 || lng == 0) {
+        final cached = AppLocationService.currentLocation;
+        if (cached.latitude != 0 && cached.longitude != 0 && cached != AppLocationService.defaultDelhi) {
+          lat = cached.latitude;
+          lng = cached.longitude;
+        }
+      }
+
       String address = state.location?.area ?? "Acquiring live location...";
 
-      // If lat/lng was 0, attempt immediate GPS fetch
+      // If lat/lng was 0, attempt fast hardware cache check
       if (lat == 0 || lng == 0) {
         try {
-          Position? pos;
-          try {
-            pos = await Geolocator.getCurrentPosition(
-              locationSettings: const LocationSettings(
-                accuracy: LocationAccuracy.high,
-                timeLimit: Duration(seconds: 3),
-              ),
-            );
-          } catch (_) {
-            pos = await Geolocator.getLastKnownPosition();
-          }
-
+          final pos = await Geolocator.getLastKnownPosition();
           if (pos != null && pos.latitude != 0 && pos.longitude != 0) {
             lat = pos.latitude;
             lng = pos.longitude;
-            address = await _getAddressFromCoordinates(lat, lng);
           }
         } catch (e) {
           debugPrint("Error fetching GPS in startEmergency: $e");
         }
-      } else if (address.contains("Locat") || address.contains("Acquir")) {
+      }
+
+      if (lat != 0 && lng != 0 && (address.contains("Locat") || address.contains("Acquir") || address.startsWith("Lat:"))) {
         address = await _getAddressFromCoordinates(lat, lng);
       }
 
       state = state.copyWith(
-        session: EmergencySession(
-          id: _activeSessionId ?? state.session?.id ?? "em_${DateTime.now().millisecondsSinceEpoch}",
-          startedAt: state.session?.startedAt ?? DateTime.now(),
+        session: state.session?.copyWith(status: EmergencyStatus.active) ?? EmergencySession(
+          id: _activeSessionId ?? "em_${DateTime.now().millisecondsSinceEpoch}",
+          startedAt: DateTime.now(),
           status: EmergencyStatus.active,
         ),
         location: EmergencyLocation(
@@ -360,17 +368,33 @@ class EmergencyNotifier extends Notifier<EmergencyState> {
         });
       }
 
-      // Dispatch EXACTLY ONE WhatsApp message to each distinct contact phone number
-      debugPrint('[Emergency] Dispatching WhatsApp messages to ${contactsToNotify.length} distinct contacts');
-      contactsToNotify.forEach((phone, name) {
-        _sendWhatsAppMessage(
-          toPhone: phone,
-          contactName: name,
+      // STRICT DEDUPLICATION: Only notify numbers that have not been sent and are not pending
+      final List<MapEntry<String, String>> unnotifiedContacts = contactsToNotify.entries.where((entry) {
+        final phone = entry.key;
+        return !_sentPhoneNumbers.contains(phone) && !_pendingPhoneNumbers.contains(phone);
+      }).toList();
+
+      debugPrint('[Emergency] Dispatching WhatsApp messages to ${unnotifiedContacts.length} unnotified contacts (total configured: ${contactsToNotify.length})');
+
+      // SYNCHRONOUSLY lock numbers as pending before any async awaits occur!
+      for (final entry in unnotifiedContacts) {
+        _pendingPhoneNumbers.add(entry.key);
+      }
+
+      // Dispatch and AWAIT all WhatsApp messages so _isDispatching remains true until complete!
+      final dispatchFutures = unnotifiedContacts.map((entry) {
+        return _sendWhatsAppMessage(
+          toPhone: entry.key,
+          contactName: entry.value,
           lat: lat,
           lng: lng,
           address: address,
         );
-      });
+      }).toList();
+
+      if (dispatchFutures.isNotEmpty) {
+        await Future.wait(dispatchFutures);
+      }
 
       // SYNC TO FIRESTORE
       _syncEmergencyToFirestore("active", realContacts.length, lat, lng, address);
@@ -428,6 +452,7 @@ class EmergencyNotifier extends Notifier<EmergencyState> {
 
   void resolveEmergency() {
     _sentPhoneNumbers.clear();
+    _pendingPhoneNumbers.clear();
     _isDispatching = false;
     _activeSessionId = null;
 
