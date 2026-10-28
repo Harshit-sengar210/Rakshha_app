@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/trusted_contact.dart';
-import '../data/mock_contacts_repository.dart';
 
 class ContactsState {
   final List<TrustedContact> contacts;
@@ -168,7 +167,7 @@ class ContactsNotifier extends Notifier<ContactsState> {
 
     try {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'priorityContact': priorityData,
+        'priorityContact': priorityData ?? FieldValue.delete(),
         'trustedContacts': trustedData,
       }, SetOptions(merge: true));
     } catch (e) {

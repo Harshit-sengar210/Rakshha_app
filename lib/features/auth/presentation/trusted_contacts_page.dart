@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
+import 'package:flutter_native_contact_picker/model/contact.dart';
 import 'package:rakshaa/core/constants/app_colors.dart';
 import '../providers/registration_provider.dart';
 import 'widgets/rakshaa_brand_header.dart';
@@ -155,6 +157,25 @@ class _TrustedContactsPageState extends ConsumerState<TrustedContactsPage> with 
   }
 }
 
+String _formatPhoneNumber(String raw) {
+  String digitsOnly = raw.replaceAll(RegExp(r'\D'), '');
+  if (digitsOnly.isEmpty) return raw.trim();
+
+  if (digitsOnly.length == 12 && digitsOnly.startsWith('91')) {
+    return '+91 ${digitsOnly.substring(2)}';
+  }
+  if (digitsOnly.length == 11 && digitsOnly.startsWith('0')) {
+    return '+91 ${digitsOnly.substring(1)}';
+  }
+  if (digitsOnly.length == 10) {
+    return '+91 $digitsOnly';
+  }
+  if (raw.trim().startsWith('+')) {
+    return raw.trim();
+  }
+  return '+91 $digitsOnly';
+}
+
 class _ContactCard extends StatelessWidget {
   final TrustedContact contact;
   final ValueChanged<TrustedContact> onUpdate;
@@ -177,7 +198,36 @@ class _ContactCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.person, color: Color(0xFF8A98B0)),
+              TextButton.icon(
+                onPressed: () async {
+                  try {
+                    final picker = FlutterNativeContactPicker();
+                    final picked = await picker.selectContact();
+                    if (picked != null) {
+                      String? name = picked.fullName?.trim();
+                      String? mobile;
+                      final phone = picked.selectedPhoneNumber ?? (picked.phoneNumbers?.isNotEmpty == true ? picked.phoneNumbers!.first : null);
+                      if (phone != null && phone.isNotEmpty) {
+                        mobile = _formatPhoneNumber(phone);
+                      }
+                      onUpdate(contact.copyWith(
+                        name: (name != null && name.isNotEmpty) ? name : contact.name,
+                        mobile: (mobile != null && mobile.isNotEmpty) ? mobile : contact.mobile,
+                      ));
+                    }
+                  } catch (_) {}
+                },
+                icon: const Icon(Icons.contacts_outlined, size: 16, color: AppColors.rakshaaCoral),
+                label: const Text(
+                  "Choose from Contacts",
+                  style: TextStyle(color: AppColors.rakshaaCoral, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(50, 30),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
               IconButton(icon: const Icon(Icons.close, color: Color(0xFF8A98B0), size: 20), onPressed: onDelete, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
             ],
           ),

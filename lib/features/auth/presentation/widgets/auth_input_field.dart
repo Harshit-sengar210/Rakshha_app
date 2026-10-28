@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:rakshaa/core/constants/app_colors.dart';
 
 class AuthInputField extends StatefulWidget {
+  final TextEditingController? controller;
   final String hintText;
   final IconData prefixIcon;
   final bool isPassword;
@@ -13,6 +14,7 @@ class AuthInputField extends StatefulWidget {
 
   const AuthInputField({
     super.key,
+    this.controller,
     required this.hintText,
     required this.prefixIcon,
     this.isPassword = false,
@@ -77,6 +79,7 @@ class _AuthInputFieldState extends State<AuthInputField> {
                 : [],
           ),
           child: TextField(
+            controller: widget.controller,
             focusNode: _focusNode,
             obscureText: widget.isPassword ? _obscureText : false,
             keyboardType: widget.keyboardType,

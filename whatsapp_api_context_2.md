@@ -7,32 +7,33 @@
 ## 1. Live Environment & Authentication Credentials
 - **Production Server URL**: `https://whatsappapi-1n7u.onrender.com`
 - **Local Dev Server URL**: `http://localhost:8080`
-- **Active Instance Name**: `user_kycqvdulwiyuyvsk`
-- **Active API Key**: `wapi_live_d0df761dd7c4658c6b471a98495dbd34`
+- **Active Instance Name**: `user_4qkhdrjvmfw4yhu3`
+- **Active API Key**: `wapi_live_429683c4c977415caafcce10f7d57e11`
+- **Internal Evolution API Token**: `429683C4C977415CAAFCCE10F7D57E11`
 - **Connected WhatsApp Number**: `+919761304821`
 - **Cloudflare R2 Media Bucket**: `rudram-media`
-- **Auth Header**: `apikey: wapi_live_d0df761dd7c4658c6b471a98495dbd34`
+- **Auth Header**: `apikey: 429683C4C977415CAAFCCE10F7D57E11` (or `apikey: wapi_live_429683c4c977415caafcce10f7d57e11`)
 
 ---
 
 ## 2. Core API Endpoints
 
 ### A. Send Plain Text Message
-- **Method & Route**: `POST https://whatsappapi-1n7u.onrender.com/message/sendText/user_kycqvdulwiyuyvsk`
-- **Headers**: `Content-Type: application/json`, `apikey: wapi_live_d0df761dd7c4658c6b471a98495dbd34`
+- **Method & Route**: `POST https://whatsappapi-1n7u.onrender.com/message/sendText/user_4qkhdrjvmfw4yhu3`
+- **Headers**: `Content-Type: application/json`, `apikey: 429683C4C977415CAAFCCE10F7D57E11`
 - **Payload**:
 ```json
 {
   "number": "+919761304821",
-  "text": "Hello! Your order from BiteChez is confirmed."
+  "text": "Hello! Your alert from Rakshaa is confirmed."
 }
 ```
 
 ---
 
 ### B. Send Image / Video / Audio
-- **Method & Route**: `POST https://whatsappapi-1n7u.onrender.com/message/sendMedia/user_kycqvdulwiyuyvsk`
-- **Headers**: `Content-Type: application/json`, `apikey: wapi_live_d0df761dd7c4658c6b471a98495dbd34`
+- **Method & Route**: `POST https://whatsappapi-1n7u.onrender.com/message/sendMedia/user_4qkhdrjvmfw4yhu3`
+- **Headers**: `Content-Type: application/json`, `apikey: 429683C4C977415CAAFCCE10F7D57E11`
 - **Payload**:
 ```json
 {
@@ -48,8 +49,8 @@
 ---
 
 ### C. Send PDF / Document (Invoices, Catalogs via Cloudflare R2)
-- **Method & Route**: `POST https://whatsappapi-1n7u.onrender.com/message/sendMedia/user_kycqvdulwiyuyvsk`
-- **Headers**: `Content-Type: application/json`, `apikey: wapi_live_d0df761dd7c4658c6b471a98495dbd34`
+- **Method & Route**: `POST https://whatsappapi-1n7u.onrender.com/message/sendMedia/user_4qkhdrjvmfw4yhu3`
+- **Headers**: `Content-Type: application/json`, `apikey: 429683C4C977415CAAFCCE10F7D57E11`
 - **Payload**:
 ```json
 {
@@ -64,7 +65,8 @@
 ---
 
 ### D. Verify WhatsApp Number
-- **Method & Route**: `POST https://whatsappapi-1n7u.onrender.com/chat/whatsappNumbers/user_kycqvdulwiyuyvsk`
+- **Method & Route**: `POST https://whatsappapi-1n7u.onrender.com/chat/whatsappNumbers/user_4qkhdrjvmfw4yhu3`
+- **Headers**: `apikey: 429683C4C977415CAAFCCE10F7D57E11`
 - **Payload**:
 ```json
 {
@@ -75,12 +77,13 @@
 ---
 
 ### E. Check Instance Connection Status
-- **Method & Route**: `GET https://whatsappapi-1n7u.onrender.com/instance/connectionState/user_kycqvdulwiyuyvsk`
+- **Method & Route**: `GET https://whatsappapi-1n7u.onrender.com/instance/connectionState/user_4qkhdrjvmfw4yhu3`
+- **Headers**: `apikey: 429683C4C977415CAAFCCE10F7D57E11`
 - **Response**:
 ```json
 {
   "instance": {
-    "instanceName": "user_kycqvdulwiyuyvsk",
+    "instanceName": "user_4qkhdrjvmfw4yhu3",
     "state": "open"
   }
 }
@@ -90,7 +93,7 @@
 
 ## 3. Webhooks Receiver (Node.js / Express Example)
 
-Register your webhook URL at `POST https://whatsappapi-1n7u.onrender.com/webhook/set/user_kycqvdulwiyuyvsk`:
+Register your webhook URL at `POST https://whatsappapi-1n7u.onrender.com/webhook/set/user_4qkhdrjvmfw4yhu3`:
 ```javascript
 const express = require('express');
 const app = express();
@@ -106,7 +109,7 @@ app.post('/api/webhooks/whatsapp', (req, res) => {
     const senderName = data.pushName || 'Customer';
 
     console.log(`New message from ${senderName} (${sender}): ${messageText}`);
-    // TODO: Process order status, trigger AI chatbot, or update database
+    // Process order status, trigger AI chatbot, or update database
   }
 
   res.status(200).json({ received: true });
@@ -127,8 +130,8 @@ export class WhatsAppHubClient {
 
   constructor(options?: { baseUrl?: string; instance?: string; apiKey?: string }) {
     this.baseUrl = options?.baseUrl || 'https://whatsappapi-1n7u.onrender.com';
-    this.instance = options?.instance || 'user_kycqvdulwiyuyvsk';
-    this.apiKey = options?.apiKey || 'wapi_live_d0df761dd7c4658c6b471a98495dbd34';
+    this.instance = options?.instance || 'user_4qkhdrjvmfw4yhu3';
+    this.apiKey = options?.apiKey || '429683C4C977415CAAFCCE10F7D57E11';
   }
 
   async sendText(toPhone: string, text: string) {
@@ -172,7 +175,7 @@ export class WhatsAppHubClient {
 
 ```html
 <script src="https://whatsappapi-1n7u.onrender.com/sdk/whatsapp-widget.js" 
-        data-instance="user_kycqvdulwiyuyvsk" 
+        data-instance="user_4qkhdrjvmfw4yhu3" 
         data-phone="+919761304821"
         data-brand="BiteChez"
         data-greeting="Hi! Need help with your order?">

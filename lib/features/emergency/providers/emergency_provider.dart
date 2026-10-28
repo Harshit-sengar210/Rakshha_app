@@ -90,8 +90,9 @@ class EmergencyNotifier extends Notifier<EmergencyState> {
     required String address,
   }) async {
     const baseUrl = 'https://whatsappapi-1n7u.onrender.com';
-    const apiKey = '429683C4C977415CAAFCCE10F7D57E11';
-    final candidateInstances = ['user_rjx6ebs', 'user_kycqvdulwiyuyvsk'];
+    const primaryApiKey = '429683C4C977415CAAFCCE10F7D57E11';
+    final candidateApiKeys = ['429683C4C977415CAAFCCE10F7D57E11', 'wapi_live_429683c4c977415caafcce10f7d57e11'];
+    final candidateInstances = ['user_4qkhdrjvmfw4yhu3', 'user_rjx6ebs', 'user_kycqvdulwiyuyvsk'];
 
     final cleanPhone = _normalizePhone(toPhone);
     if (cleanPhone.isEmpty) return;
@@ -131,67 +132,76 @@ class EmergencyNotifier extends Notifier<EmergencyState> {
     bool sentSuccessfully = false;
 
     for (final inst in candidateInstances) {
-      try {
-        final res = await http.post(
-          Uri.parse('$baseUrl/message/sendText/$inst'),
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': apiKey,
-          },
-          body: jsonEncode({
-            'number': cleanPhone,
-            'text': messageText,
-          }),
-        ).timeout(const Duration(seconds: 8));
+      for (final key in candidateApiKeys) {
+        try {
+          final res = await http.post(
+            Uri.parse('$baseUrl/message/sendText/$inst'),
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': key,
+            },
+            body: jsonEncode({
+              'number': cleanPhone,
+              'text': messageText,
+            }),
+          ).timeout(const Duration(seconds: 8));
 
-        if (res.statusCode == 200 || res.statusCode == 201) {
-          debugPrint('WhatsApp alert sent to $cleanPhone successfully via $inst');
-          sentSuccessfully = true;
-          break;
-        } else {
-          debugPrint('WhatsApp alert send failed via $inst (${res.statusCode}): ${res.body}');
+          if (res.statusCode == 200 || res.statusCode == 201) {
+            debugPrint('WhatsApp alert sent to $cleanPhone successfully via $inst');
+            sentSuccessfully = true;
+            break;
+          } else {
+            debugPrint('WhatsApp alert send failed via $inst (${res.statusCode}): ${res.body}');
+            if (res.statusCode != 401) {
+              break; // Not an auth error, skip trying other keys for this instance
+            }
+          }
+        } catch (e) {
+          debugPrint('Error sending WhatsApp SOS alert via $inst: $e');
         }
-      } catch (e) {
-        debugPrint('Error sending WhatsApp SOS alert via $inst: $e');
       }
+      if (sentSuccessfully) break;
     }
 
     // Dynamic recovery: If predefined instances failed, fetch current open instance from server
     if (!sentSuccessfully) {
-      try {
-        final fetchRes = await http.get(
-          Uri.parse('$baseUrl/instance/fetchInstances'),
-          headers: {'apikey': apiKey},
-        ).timeout(const Duration(seconds: 5));
+      for (final key in candidateApiKeys) {
+        try {
+          final fetchRes = await http.get(
+            Uri.parse('$baseUrl/instance/fetchInstances'),
+            headers: {'apikey': key},
+          ).timeout(const Duration(seconds: 5));
 
-        if (fetchRes.statusCode == 200) {
-          final List<dynamic> instances = jsonDecode(fetchRes.body);
-          for (final item in instances) {
-            final name = item['name']?.toString() ?? '';
-            final status = item['connectionStatus']?.toString() ?? '';
-            if (status == 'open' && name.isNotEmpty && !candidateInstances.contains(name)) {
-              final retryRes = await http.post(
-                Uri.parse('$baseUrl/message/sendText/$name'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': apiKey,
-                },
-                body: jsonEncode({
-                  'number': cleanPhone,
-                  'text': messageText,
-                }),
-              ).timeout(const Duration(seconds: 8));
+          if (fetchRes.statusCode == 200) {
+            final List<dynamic> instances = jsonDecode(fetchRes.body);
+            for (final item in instances) {
+              final name = item['name']?.toString() ?? '';
+              final status = item['connectionStatus']?.toString() ?? '';
+              if (status == 'open' && name.isNotEmpty && !candidateInstances.contains(name)) {
+                final retryRes = await http.post(
+                  Uri.parse('$baseUrl/message/sendText/$name'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': key,
+                  },
+                  body: jsonEncode({
+                    'number': cleanPhone,
+                    'text': messageText,
+                  }),
+                ).timeout(const Duration(seconds: 8));
 
-              if (retryRes.statusCode == 200 || retryRes.statusCode == 201) {
-                debugPrint('WhatsApp alert sent to $cleanPhone via auto-discovered instance $name');
-                sentSuccessfully = true;
-                break;
+                if (retryRes.statusCode == 200 || retryRes.statusCode == 201) {
+                  debugPrint('WhatsApp alert sent to $cleanPhone via auto-discovered instance $name');
+                  sentSuccessfully = true;
+                  break;
+                }
               }
             }
           }
+          if (sentSuccessfully) break;
+        } catch (e) {
+          debugPrint('Auto-discovery instance check failed: $e');
         }
-      } catch (e) {
-        debugPrint('Auto-discovery instance check failed: $e');
       }
     }
 

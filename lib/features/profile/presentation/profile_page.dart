@@ -53,7 +53,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
         ?? user?.photoURL
         ?? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150';
 
-    final int contactsCount = contactsState.contacts.isNotEmpty ? contactsState.contacts.length : 3;
+    final int contactsCount = contactsState.contacts.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFF090A10),
@@ -215,6 +215,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                           onTap: _showAboutAppModal,
                         ),
                       ]),
+                      const SizedBox(height: 22),
+
+                      // 7. Log Out Action Button
+                      _buildLogoutButton(),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -829,16 +833,238 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
             const Text("Rakshaa Safety Network", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             const Text("Version 1.0.0 (Enterprise Edition)", style: TextStyle(color: Colors.white60, fontSize: 13)),
+            const SizedBox(height: 16),
+            Text(
+              "Rakshaa provides continuous safety monitoring, emergency WhatsApp broadcasting, and live location sharing.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12.5, height: 1.4),
+            ),
             const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.logout_rounded, color: Color(0xFFFF2E63)),
-              title: const Text("Log Out", style: TextStyle(color: Color(0xFFFF2E63), fontWeight: FontWeight.bold)),
-              onTap: () async {
-                await FirebaseAuth.instance.signOut();
-                if (mounted) context.go('/login');
-              },
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF2E63),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Close", style: TextStyle(color: Colors.white)),
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // --- Dedicated Log Out Action ---
+  Widget _buildLogoutButton() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF131622).withOpacity(0.85),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFFF2E63).withOpacity(0.25),
+          width: 1.1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: _showLogoutConfirmationDialog,
+          splashColor: const Color(0xFFFF2E63).withOpacity(0.15),
+          highlightColor: const Color(0xFFFF2E63).withOpacity(0.08),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF2E63).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFFF2E63).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.logout_rounded,
+                      color: Color(0xFFFF2E63),
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Log Out",
+                        style: TextStyle(
+                          color: Color(0xFFFF2E63),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        "Sign out of your Rakshaa account",
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: const Color(0xFFFF2E63).withOpacity(0.6),
+                  size: 14,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLogoutConfirmationDialog() {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF131622),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag Indicator Bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Glowing Warning/Logout Icon
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFF2E63).withOpacity(0.15),
+                  border: Border.all(
+                    color: const Color(0xFFFF2E63).withOpacity(0.35),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.logout_rounded,
+                    color: Color(0xFFFF2E63),
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              const Text(
+                "Log Out of Rakshaa?",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              Text(
+                "Are you sure you want to log out? You will need to sign in again to send emergency SOS alerts.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.65),
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Buttons
+              Row(
+                children: [
+                  // Cancel Button
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text(
+                        "Cancel",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Confirm Log Out Button
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF2E63),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () async {
+                        HapticFeedback.heavyImpact();
+                        Navigator.pop(ctx);
+                        await FirebaseAuth.instance.signOut();
+                        if (mounted) {
+                          context.go('/login');
+                        }
+                      },
+                      child: const Text(
+                        "Log Out",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );

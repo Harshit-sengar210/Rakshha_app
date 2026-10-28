@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
+import 'package:flutter_native_contact_picker/model/contact.dart';
 import 'package:rakshaa/core/constants/app_colors.dart';
 import '../providers/registration_provider.dart';
 import 'widgets/rakshaa_brand_header.dart';
@@ -19,7 +21,7 @@ class _PriorityContactPageState extends ConsumerState<PriorityContactPage> with 
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
-  final _mobileController = TextEditingController(text: '+91 ');
+  final _mobileController = TextEditingController();
   String _relationship = 'Parent';
   bool _isSuccess = false;
 
@@ -45,9 +47,10 @@ class _PriorityContactPageState extends ConsumerState<PriorityContactPage> with 
         return;
       }
       
+      final formattedMobile = _formatPhoneNumber(_mobileController.text.trim());
       ref.read(registrationProvider.notifier).updatePriorityContact(PriorityContact(
         name: _nameController.text.trim(),
-        mobile: _mobileController.text.trim(),
+        mobile: formattedMobile,
         relationship: _relationship,
       ));
 
@@ -58,29 +61,47 @@ class _PriorityContactPageState extends ConsumerState<PriorityContactPage> with 
     }
   }
 
-  void _showContactsPlaceholder() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        height: 200,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.contacts, size: 48, color: AppColors.rakshaaCoral),
-            const SizedBox(height: 16),
-            const Text("Contact access will be connected later.", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.deepNavy)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => context.pop(),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.rakshaaCoral, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
-              child: const Text("Got it"),
-            ),
-          ],
-        ),
-      ),
-    );
+  final FlutterNativeContactPicker _contactPicker = FlutterNativeContactPicker();
+
+  Future<void> _pickContactFromDevice() async {
+    try {
+      final Contact? contact = await _contactPicker.selectContact();
+      if (contact != null) {
+        if (contact.fullName != null && contact.fullName!.trim().isNotEmpty) {
+          _nameController.text = contact.fullName!.trim();
+        }
+        final phone = contact.selectedPhoneNumber ?? (contact.phoneNumbers?.isNotEmpty == true ? contact.phoneNumbers!.first : null);
+        if (phone != null && phone.isNotEmpty) {
+          _mobileController.text = _formatPhoneNumber(phone);
+        }
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error picking contact: $e")),
+        );
+      }
+    }
+  }
+
+  String _formatPhoneNumber(String raw) {
+    String digitsOnly = raw.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.isEmpty) return raw.trim();
+
+    if (digitsOnly.length == 12 && digitsOnly.startsWith('91')) {
+      return '+91 ${digitsOnly.substring(2)}';
+    }
+    if (digitsOnly.length == 11 && digitsOnly.startsWith('0')) {
+      return '+91 ${digitsOnly.substring(1)}';
+    }
+    if (digitsOnly.length == 10) {
+      return '+91 $digitsOnly';
+    }
+    if (raw.trim().startsWith('+')) {
+      return raw.trim();
+    }
+    return '+91 $digitsOnly';
   }
 
   @override
@@ -142,7 +163,7 @@ class _PriorityContactPageState extends ConsumerState<PriorityContactPage> with 
 
                     Center(
                       child: OutlinedButton.icon(
-                        onPressed: _showContactsPlaceholder,
+                        onPressed: _pickContactFromDevice,
                         icon: const Icon(Icons.contacts_outlined, size: 18),
                         label: const Text("Choose from Contacts"),
                         style: OutlinedButton.styleFrom(
@@ -155,16 +176,16 @@ class _PriorityContactPageState extends ConsumerState<PriorityContactPage> with 
                     const SizedBox(height: 24),
 
                     AuthInputField(
+                      controller: _nameController,
                       hintText: "e.g. Mom / Dad / Rohan",
                       prefixIcon: Icons.person_outline,
-                      onChanged: (v) => _nameController.text = v,
                     ),
                     const SizedBox(height: 16),
                     AuthInputField(
+                      controller: _mobileController,
                       hintText: "+91 | Phone Number",
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
-                      onChanged: (v) => _mobileController.text = v,
                     ),
                     const SizedBox(height: 16),
                     Container(

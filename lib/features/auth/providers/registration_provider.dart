@@ -154,8 +154,9 @@ class RegistrationNotifier extends Notifier<RegistrationData> {
     state = state.copyWith(generatedOtp: otp);
 
     const baseUrl = 'https://whatsappapi-1n7u.onrender.com';
-    const apiKey = '429683C4C977415CAAFCCE10F7D57E11';
-    final candidateInstances = ['user_rjx6ebs', 'user_kycqvdulwiyuyvsk'];
+    const primaryApiKey = '429683C4C977415CAAFCCE10F7D57E11';
+    final candidateApiKeys = ['429683C4C977415CAAFCCE10F7D57E11', 'wapi_live_429683c4c977415caafcce10f7d57e11'];
+    final candidateInstances = ['user_4qkhdrjvmfw4yhu3', 'user_rjx6ebs', 'user_kycqvdulwiyuyvsk'];
 
     String cleanPhone = state.mobileNumber.replaceAll(RegExp(r'\D'), '');
     if (cleanPhone.isEmpty) return;
@@ -169,27 +170,78 @@ class RegistrationNotifier extends Notifier<RegistrationData> {
 
     final messageText = "Welcome to Rakshaa! Your verification OTP code is: *$otp*\n\nPlease enter this code in the app to continue your registration.";
 
+    bool sentSuccessfully = false;
+
     for (final inst in candidateInstances) {
-      try {
-        final res = await http.post(
-          Uri.parse('$baseUrl/message/sendText/$inst'),
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': apiKey,
-          },
-          body: jsonEncode({
-            'number': cleanPhone,
-            'text': messageText,
-          }),
-        ).timeout(const Duration(seconds: 8));
-        if (res.statusCode == 200 || res.statusCode == 201) {
-          debugPrint('WhatsApp OTP sent successfully via $inst');
-          break;
-        } else {
-          debugPrint('WhatsApp OTP send failed via $inst: ${res.body}');
+      for (final key in candidateApiKeys) {
+        try {
+          final res = await http.post(
+            Uri.parse('$baseUrl/message/sendText/$inst'),
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': key,
+            },
+            body: jsonEncode({
+              'number': cleanPhone,
+              'text': messageText,
+            }),
+          ).timeout(const Duration(seconds: 8));
+          if (res.statusCode == 200 || res.statusCode == 201) {
+            debugPrint('WhatsApp OTP sent successfully via $inst');
+            sentSuccessfully = true;
+            break;
+          } else {
+            debugPrint('WhatsApp OTP send failed via $inst: ${res.body}');
+            if (res.statusCode != 401) {
+              break;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error sending WhatsApp OTP via $inst: $e');
         }
-      } catch (e) {
-        debugPrint('Error sending WhatsApp OTP via $inst: $e');
+      }
+      if (sentSuccessfully) break;
+    }
+
+    // Dynamic recovery: If candidate instances failed, find active open instance on server
+    if (!sentSuccessfully) {
+      for (final key in candidateApiKeys) {
+        try {
+          final fetchRes = await http.get(
+            Uri.parse('$baseUrl/instance/fetchInstances'),
+            headers: {'apikey': key},
+          ).timeout(const Duration(seconds: 5));
+
+          if (fetchRes.statusCode == 200) {
+            final List<dynamic> instances = jsonDecode(fetchRes.body);
+            for (final item in instances) {
+              final name = item['name']?.toString() ?? '';
+              final status = item['connectionStatus']?.toString() ?? '';
+              if (status == 'open' && name.isNotEmpty && !candidateInstances.contains(name)) {
+                final retryRes = await http.post(
+                  Uri.parse('$baseUrl/message/sendText/$name'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': key,
+                  },
+                  body: jsonEncode({
+                    'number': cleanPhone,
+                    'text': messageText,
+                  }),
+                ).timeout(const Duration(seconds: 8));
+
+                if (retryRes.statusCode == 200 || retryRes.statusCode == 201) {
+                  debugPrint('WhatsApp OTP sent successfully via auto-discovered $name');
+                  sentSuccessfully = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (sentSuccessfully) break;
+        } catch (e) {
+          debugPrint('Auto-discovery instance check failed for OTP: $e');
+        }
       }
     }
 

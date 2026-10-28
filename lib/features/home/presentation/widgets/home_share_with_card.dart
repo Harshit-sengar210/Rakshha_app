@@ -17,27 +17,10 @@ class HomeShareWithCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Default fallback contacts matching the mockup if none are registered yet
-    final defaultMockContacts = [
-      {
-        'name': 'Mom',
-        'image': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-        'isOnline': true,
-      },
-      {
-        'name': 'Dad',
-        'image': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-        'isOnline': true,
-      },
-      {
-        'name': 'Sister',
-        'image': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-        'isOnline': true,
-      },
-    ];
-
-    final displayList = contacts.isNotEmpty ? contacts : defaultMockContacts;
-    final countLabel = "${displayList.length} trusted contacts";
+    final displayList = contacts;
+    final countLabel = contacts.isNotEmpty
+        ? "${contacts.length} trusted contact${contacts.length == 1 ? '' : 's'}"
+        : "0 contacts added";
 
     return Container(
       width: double.infinity,

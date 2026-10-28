@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
+import 'package:flutter_native_contact_picker/model/contact.dart';
 import 'package:rakshaa/features/home/presentation/widgets/rakshaa_bottom_nav.dart';
 import '../providers/contacts_provider.dart';
 import '../models/trusted_contact.dart';
@@ -35,36 +38,7 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
   Widget build(BuildContext context) {
     final contactsState = ref.watch(contactsProvider);
     final realContacts = contactsState.contacts;
-
-    // Fallback default contacts matching the reference mockup
-    final defaultMockContacts = [
-      TrustedContact(
-        id: 'mock_mom',
-        name: 'Mom',
-        relationship: 'Mother',
-        phone: '+91 98765 43210',
-        isPriority: true,
-        isWhatsAppEnabled: true,
-      ),
-      TrustedContact(
-        id: 'mock_dad',
-        name: 'Dad',
-        relationship: 'Father',
-        phone: '+91 91234 56789',
-        isPriority: false,
-        isWhatsAppEnabled: true,
-      ),
-      TrustedContact(
-        id: 'mock_sister',
-        name: 'Sister',
-        relationship: 'Sibling',
-        phone: '+91 87654 32109',
-        isPriority: false,
-        isWhatsAppEnabled: true,
-      ),
-    ];
-
-    final displayContacts = realContacts.isNotEmpty ? realContacts : defaultMockContacts;
+    final displayContacts = realContacts;
 
     return Scaffold(
       backgroundColor: const Color(0xFF090A10),
@@ -85,17 +59,23 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
                       _buildHeader(),
                       const SizedBox(height: 20),
 
-                      // 2. Status Banner (3 Contacts Added - Active)
+                      // 2. Status Banner (Contacts Count & Active/Needs Setup)
                       _buildStatusBanner(displayContacts.length),
                       const SizedBox(height: 16),
 
-                      // 3. Contact Cards List
-                      ...displayContacts.map((contact) => _buildContactCard(contact)),
+                      // 3. Contact Cards List OR Empty State
+                      if (displayContacts.isEmpty) ...[
+                        _buildEmptyState(),
+                      ] else ...[
+                        ...displayContacts.map((contact) => _buildContactCard(contact)),
+                      ],
 
                       const SizedBox(height: 10),
 
                       // 4. "Add Emergency Contact" Dashed Card
-                      _buildAddContactCard(),
+                      if (displayContacts.length < 5) ...[
+                        _buildAddContactCard(),
+                      ],
 
                       const SizedBox(height: 24),
                     ],
@@ -300,8 +280,18 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
     );
   }
 
-  // --- Status Banner (3 Contacts Added - Active) ---
+  // --- Status Banner (Active or Needs Setup) ---
   Widget _buildStatusBanner(int count) {
+    final bool hasContacts = count > 0;
+    final Color badgeColor = hasContacts ? const Color(0xFF00E676) : const Color(0xFFFFB703);
+    final String badgeText = hasContacts ? "Active" : "Needs Setup";
+    final String titleText = hasContacts
+        ? "$count Contact${count == 1 ? '' : 's'} Added"
+        : "0 Contacts Added";
+    final String subtitleText = hasContacts
+        ? "Your safety network is ready"
+        : "No emergency contacts configured yet";
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -314,22 +304,26 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
       ),
       child: Row(
         children: [
-          // Rounded Red Square with 2 People Icon
+          // Rounded Square with People Icon
           Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFFF2E63).withOpacity(0.2),
+              color: hasContacts
+                  ? const Color(0xFFFF2E63).withOpacity(0.2)
+                  : const Color(0xFFFFB703).withOpacity(0.15),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: const Color(0xFFFF2E63).withOpacity(0.35),
+                color: hasContacts
+                    ? const Color(0xFFFF2E63).withOpacity(0.35)
+                    : const Color(0xFFFFB703).withOpacity(0.35),
                 width: 1,
               ),
             ),
-            child: const Center(
+            child: Center(
               child: Icon(
-                Icons.group_rounded,
-                color: Color(0xFFFF2E63),
+                hasContacts ? Icons.group_rounded : Icons.group_add_rounded,
+                color: hasContacts ? const Color(0xFFFF2E63) : const Color(0xFFFFB703),
                 size: 24,
               ),
             ),
@@ -343,7 +337,7 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "$count Contacts Added",
+                  titleText,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
@@ -352,7 +346,7 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  "Your safety network is ready",
+                  subtitleText,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.55),
                     fontSize: 12,
@@ -363,14 +357,14 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
             ),
           ),
 
-          // Active Green Pill
+          // Badge Pill
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF00E676).withOpacity(0.15),
+              color: badgeColor.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF00E676).withOpacity(0.4),
+                color: badgeColor.withOpacity(0.4),
                 width: 0.9,
               ),
             ),
@@ -380,16 +374,16 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF00E676),
+                  decoration: BoxDecoration(
+                    color: badgeColor,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 5),
-                const Text(
-                  "Active",
+                Text(
+                  badgeText,
                   style: TextStyle(
-                    color: Color(0xFF00E676),
+                    color: badgeColor,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -402,16 +396,121 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
     );
   }
 
-  // --- Contact Card (Mom, Dad, Sister) ---
-  Widget _buildContactCard(TrustedContact contact) {
+  // --- Empty State (Shown when 0 contacts added) ---
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131622).withOpacity(0.7),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+          width: 1.1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFFF2E63).withOpacity(0.12),
+              border: Border.all(
+                color: const Color(0xFFFF2E63).withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.person_add_alt_1_rounded,
+                color: Color(0xFFFF2E63),
+                size: 30,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "No Emergency Contacts Yet",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Add up to 5 family members or friends who will instantly receive your WhatsApp SOS and live tracking link during emergencies.",
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 12.5,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Avatar Builder with Fallback to Initials ---
+  Widget _buildAvatar(TrustedContact contact) {
     final photoMap = {
       'Mom': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
       'Dad': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
       'Sister': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
     };
+    final photoUrl = photoMap[contact.name];
+    final String initial = contact.name.trim().isNotEmpty
+        ? contact.name.trim()[0].toUpperCase()
+        : '?';
 
-    final avatarUrl = photoMap[contact.name] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: photoUrl == null
+            ? const LinearGradient(
+                colors: [Color(0xFF2A2E42), Color(0xFF1B1E2E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        border: Border.all(
+          color: contact.isPriority
+              ? const Color(0xFFFFB703).withOpacity(0.8)
+              : Colors.white.withOpacity(0.18),
+          width: 1.5,
+        ),
+        image: photoUrl != null
+            ? DecorationImage(
+                image: NetworkImage(photoUrl),
+                fit: BoxFit.cover,
+              )
+            : null,
+      ),
+      child: photoUrl == null
+          ? Center(
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          : null,
+    );
+  }
 
+  // --- Contact Card ---
+  Widget _buildContactCard(TrustedContact contact) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
@@ -419,7 +518,9 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
         color: const Color(0xFF131622).withOpacity(0.85),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: Colors.white.withOpacity(0.08),
+          color: contact.isPriority
+              ? const Color(0xFFFFB703).withOpacity(0.3)
+              : Colors.white.withOpacity(0.08),
           width: 1.1,
         ),
         boxShadow: [
@@ -432,22 +533,11 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
       ),
       child: Column(
         children: [
-          // Top Row: Avatar + Name + Relationship + Active Badge + Menu
+          // Top Row: Avatar + Name + Priority/Relationship + Active Badge + Menu
           Row(
             children: [
               // Avatar
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.5),
-                  image: DecorationImage(
-                    image: NetworkImage(avatarUrl),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
+              _buildAvatar(contact),
               const SizedBox(width: 12),
 
               // Name, Relationship Pill & Phone
@@ -457,16 +547,44 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
                   children: [
                     Row(
                       children: [
-                        Text(
-                          contact.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                        Flexible(
+                          child: Text(
+                            contact.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (contact.isPriority) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFB703).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.star_rounded, color: Color(0xFFFFB703), size: 11),
+                                SizedBox(width: 2),
+                                Text(
+                                  "Priority",
+                                  style: TextStyle(
+                                    color: Color(0xFFFFB703),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (contact.relationship.isNotEmpty) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
@@ -560,58 +678,97 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
           // Bottom Actions Row (Message, Call, Share Now)
           Row(
             children: [
-              // 1. Message (White icon)
+              // 1. Message (WhatsApp chat)
               Expanded(
                 child: _buildActionButton(
                   icon: Icons.chat_bubble_rounded,
                   iconColor: Colors.white,
                   label: "Message",
-                  onTap: () {
+                  onTap: () async {
                     HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: const Color(0xFF131622),
-                        content: Text("Messaging ${contact.name} on WhatsApp..."),
-                      ),
-                    );
+                    final rawDigits = contact.phone.replaceAll(RegExp(r'\D'), '');
+                    final cleanPhone = rawDigits.startsWith('91') && rawDigits.length == 12
+                        ? rawDigits
+                        : (rawDigits.length == 10 ? '91$rawDigits' : rawDigits);
+                    final uri = Uri.parse('https://wa.me/$cleanPhone');
+                    try {
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF131622),
+                              content: Text("Opening WhatsApp with ${contact.name}..."),
+                            ),
+                          );
+                        }
+                      }
+                    } catch (_) {}
                   },
                 ),
               ),
               const SizedBox(width: 8),
 
-              // 2. Call (Green icon)
+              // 2. Call (Native Phone Dialer)
               Expanded(
                 child: _buildActionButton(
                   icon: Icons.phone_in_talk_rounded,
                   iconColor: const Color(0xFF00E676),
                   label: "Call",
-                  onTap: () {
+                  onTap: () async {
                     HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: const Color(0xFF131622),
-                        content: Text("Calling ${contact.name} (${contact.phone})..."),
-                      ),
-                    );
+                    final cleanPhone = contact.phone.replaceAll(RegExp(r'[^\d+]'), '');
+                    final uri = Uri.parse('tel:$cleanPhone');
+                    try {
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri);
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF131622),
+                              content: Text("Calling ${contact.name} (${contact.phone})..."),
+                            ),
+                          );
+                        }
+                      }
+                    } catch (_) {}
                   },
                 ),
               ),
               const SizedBox(width: 8),
 
-              // 3. Share Now (Purple icon)
+              // 3. Share Now (WhatsApp Share with link)
               Expanded(
                 child: _buildActionButton(
                   icon: Icons.near_me_rounded,
                   iconColor: const Color(0xFFBA68C8),
                   label: "Share Now",
-                  onTap: () {
+                  onTap: () async {
                     HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: const Color(0xFF131622),
-                        content: Text("Sharing live location with ${contact.name}..."),
-                      ),
+                    final rawDigits = contact.phone.replaceAll(RegExp(r'\D'), '');
+                    final cleanPhone = rawDigits.startsWith('91') && rawDigits.length == 12
+                        ? rawDigits
+                        : (rawDigits.length == 10 ? '91$rawDigits' : rawDigits);
+                    final msg = Uri.encodeComponent(
+                      "Hi ${contact.name}, I am sharing my live location with you via Rakshaa safety app for my security.",
                     );
+                    final uri = Uri.parse('https://wa.me/$cleanPhone?text=$msg');
+                    try {
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF131622),
+                              content: Text("Sharing live location with ${contact.name}..."),
+                            ),
+                          );
+                        }
+                      }
+                    } catch (_) {}
                   },
                 ),
               ),
@@ -738,6 +895,25 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
     );
   }
 
+  String _formatPhoneNumber(String raw) {
+    String digitsOnly = raw.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.isEmpty) return raw.trim();
+
+    if (digitsOnly.length == 12 && digitsOnly.startsWith('91')) {
+      return '+91 ${digitsOnly.substring(2)}';
+    }
+    if (digitsOnly.length == 11 && digitsOnly.startsWith('0')) {
+      return '+91 ${digitsOnly.substring(1)}';
+    }
+    if (digitsOnly.length == 10) {
+      return '+91 $digitsOnly';
+    }
+    if (raw.trim().startsWith('+')) {
+      return raw.trim();
+    }
+    return '+91 $digitsOnly';
+  }
+
   void _showAddContactModal() {
     final nameController = TextEditingController();
     final phoneController = TextEditingController(text: "+91 ");
@@ -777,7 +953,47 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
                 "Add Emergency Contact",
                 style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+
+              // Choose from Phone Contacts Button
+              Center(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final picker = FlutterNativeContactPicker();
+                      final contact = await picker.selectContact();
+                      if (contact != null) {
+                        setModalState(() {
+                          if (contact.fullName != null && contact.fullName!.trim().isNotEmpty) {
+                            nameController.text = contact.fullName!.trim();
+                          }
+                          final phone = contact.selectedPhoneNumber ?? (contact.phoneNumbers?.isNotEmpty == true ? contact.phoneNumbers!.first : null);
+                          if (phone != null && phone.isNotEmpty) {
+                            phoneController.text = _formatPhoneNumber(phone);
+                          }
+                        });
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Could not pick contact: $e")),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.contacts_rounded, size: 18, color: Color(0xFFFF2E63)),
+                  label: const Text(
+                    "Choose from Contacts",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: const Color(0xFFFF2E63).withOpacity(0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
 
               // Name Field
               TextField(
@@ -884,14 +1100,27 @@ class _ContactsPageState extends ConsumerState<ContactsPage> with SingleTickerPr
                 onTap: () {
                   ref.read(contactsProvider.notifier).setPriorityContact(contact.id);
                   Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: const Color(0xFF131622),
+                      content: Text("${contact.name} set as priority contact."),
+                    ),
+                  );
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFF2E63)),
                 title: const Text("Remove Contact", style: TextStyle(color: Color(0xFFFF2E63))),
                 onTap: () {
+                  final removedName = contact.name;
                   ref.read(contactsProvider.notifier).removeContact(contact.id);
                   Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: const Color(0xFF131622),
+                      content: Text("$removedName removed from emergency contacts."),
+                    ),
+                  );
                 },
               ),
             ],
